@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>字字珠機 - iPad自由手寫修復版</title>
+  <title>字字珠機 - iPad手寫徹底修復版</title>
   <style>
     :root {
       --primary-grad: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
@@ -16,8 +16,6 @@
 
     * {
       box-sizing: border-box;
-      user-select: none;
-      -webkit-user-select: none;
       margin: 0;
       padding: 0;
     }
@@ -150,7 +148,7 @@
       font-weight: 800;
     }
 
-    /* 輸入框樣式 */
+    /* 輸入框核心修復樣式 */
     .char-input {
       width: 100%;
       height: 100%;
@@ -164,8 +162,10 @@
       outline: none;
       caret-color: #2563eb;
       transition: all 0.2s ease;
-      user-select: auto;
-      -webkit-user-select: auto;
+      /* 允許選取與手寫輸入 */
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      -webkit-appearance: none;
     }
 
     .char-input:focus {
@@ -196,7 +196,6 @@
     .tag-left { left: 4px; }
     .tag-right { right: 4px; }
 
-    /* 操作提示與控制按鈕區 */
     .input-hint-box {
       background: #f1f5f9;
       border: 2px dashed #94a3b8;
@@ -358,8 +357,8 @@
       background: #ffffff;
       color: #1e293b;
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-      user-select: auto;
-      -webkit-user-select: auto;
+      user-select: text !important;
+      -webkit-user-select: text !important;
     }
 
     .rank-badge {
@@ -435,7 +434,7 @@
       <div class="rule-card">
         <div style="font-weight:800; font-size:1.1rem; margin-bottom:6px; color:#1e2937;">📖 攤位遊戲說明：</div>
         <ul>
-          <li><strong>自由思考輸入</strong>：點選空格後，用 iPad 手寫或鍵盤打出漢字（無選項參考）。</li>
+          <li><strong>自由思考輸入</strong>：點選空格，用 iPad 手寫或鍵盤打出漢字（無選項參考）。</li>
           <li><strong>組詞原則</strong>：
             <br>• 上、左：輸入字與中央字組成詞語（如「<strong>雨</strong>水」、「<strong>海</strong>水」）
             <br>• 下、右：中央字與輸入字組成詞語（如「水<strong>管</strong>」、「水<strong>車</strong>」）
@@ -489,13 +488,13 @@
       <!-- 上 -->
       <div class="grid-cell cell-top">
         <span class="dir-tag tag-top">上</span>
-        <input type="text" id="input-top" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <input type="text" id="input-top" class="char-input" inputmode="text" autocomplete="off" />
       </div>
 
       <!-- 左 -->
       <div class="grid-cell cell-left">
         <span class="dir-tag tag-left">左</span>
-        <input type="text" id="input-left" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <input type="text" id="input-left" class="char-input" inputmode="text" autocomplete="off" />
       </div>
 
       <!-- 中（提示字） -->
@@ -504,18 +503,18 @@
       <!-- 右 -->
       <div class="grid-cell cell-right">
         <span class="dir-tag tag-right">右</span>
-        <input type="text" id="input-right" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <input type="text" id="input-right" class="char-input" inputmode="text" autocomplete="off" />
       </div>
 
       <!-- 下 -->
       <div class="grid-cell cell-bottom">
         <span class="dir-tag tag-bottom">下</span>
-        <input type="text" id="input-bottom" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <input type="text" id="input-bottom" class="char-input" inputmode="text" autocomplete="off" />
       </div>
     </div>
 
     <div class="input-hint-box">
-      ✍️ 點擊上方任意空格，使用 iPad 手寫或鍵盤輸入漢字，填滿後點擊「驗證送出」！
+      ✍️ 點擊空格即可調出 iPad 手寫板寫字！填滿四格後點擊「驗證送出」。
     </div>
 
     <div class="action-row">
@@ -589,7 +588,6 @@
     let timer = null;
     let playerName = "挑戰者";
 
-    // 音效
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playTone(freq, type, duration) {
       try {
@@ -650,65 +648,22 @@
         const input = document.getElementById(`input-${pos}`);
         input.value = "";
         input.classList.remove('filled');
-        setupInputListeners(input, pos);
+        
+        // 綁定極簡輸入處理（確保手寫完整寫入）
+        input.oninput = () => {
+          if (input.value.length > 0) {
+            // 只保留最後輸入的一個字
+            input.value = input.value.slice(-1);
+            input.classList.add('filled');
+          } else {
+            input.classList.remove('filled');
+          }
+        };
+
+        input.onfocus = () => soundTap();
       });
 
-      // 自動聚焦第一格
-      setTimeout(() => {
-        document.getElementById('input-top').focus();
-      }, 300);
-
       startTimer();
-    }
-
-    // ⭐ 關鍵修復：專門為手寫/中文輸入法綁定的監聽事件
-    function setupInputListeners(input, pos) {
-      let isComposing = false; // 是否處於手寫組字狀態
-
-      input.oncompositionstart = () => {
-        isComposing = true; // 學生開始落筆手寫，鎖定自動跳格
-      };
-
-      input.oncompositionend = () => {
-        isComposing = false; // 學生選定漢字，完成寫字
-        finalizeInput(input, pos);
-      };
-
-      input.oninput = () => {
-        // 只有當「非組字手寫狀態」時（例如直接貼上或英文退格），才處理
-        if (!isComposing) {
-          finalizeInput(input, pos);
-        }
-      };
-
-      input.onfocus = () => soundTap();
-    }
-
-    function finalizeInput(input, pos) {
-      let val = input.value.trim();
-      if (val.length > 0) {
-        // 若輸入多於一個字，只取最後寫入的那個字
-        val = val.slice(-1);
-        input.value = val;
-        input.classList.add('filled');
-        autoAdvance(pos);
-      } else {
-        input.classList.remove('filled');
-      }
-    }
-
-    function autoAdvance(currentPos) {
-      const order = ['top', 'right', 'bottom', 'left'];
-      const currentIndex = order.indexOf(currentPos);
-      
-      for (let i = 1; i <= order.length; i++) {
-        const nextPos = order[(currentIndex + i) % order.length];
-        const nextInput = document.getElementById(`input-${nextPos}`);
-        if (nextInput.value.trim() === "") {
-          nextInput.focus();
-          break;
-        }
-      }
     }
 
     function verifyAnswers() {
@@ -761,7 +716,6 @@
         input.value = "";
         input.classList.remove('filled');
       });
-      document.getElementById('input-top').focus();
     }
 
     function startTimer() {
