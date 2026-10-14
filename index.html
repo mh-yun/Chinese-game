@@ -702,4 +702,141 @@
       const currentIndex = order.indexOf(currentPos);
       
       for (let i = 1; i <= order.length; i++) {
-        const nextPos = order
+        const nextPos = order[(currentIndex + i) % order.length];
+        const nextInput = document.getElementById(`input-${nextPos}`);
+        if (nextInput.value.trim() === "") {
+          nextInput.focus();
+          break;
+        }
+      }
+    }
+
+    function verifyAnswers() {
+      const topVal = document.getElementById('input-top').value.trim();
+      const bottomVal = document.getElementById('input-bottom').value.trim();
+      const leftVal = document.getElementById('input-left').value.trim();
+      const rightVal = document.getElementById('input-right').value.trim();
+
+      if (!topVal || !bottomVal || !leftVal || !rightVal) {
+        alert("請先填滿上、下、左、右四個格子喔！");
+        return;
+      }
+
+      clearInterval(timer);
+      const q = currentQuestions[currentQIndex];
+
+      const isTopValid = q.validPrefixes.includes(topVal);
+      const isLeftValid = q.validPrefixes.includes(leftVal);
+      const isPrefixUnique = (topVal !== leftVal);
+
+      const isBottomValid = q.validSuffixes.includes(bottomVal);
+      const isRightValid = q.validSuffixes.includes(rightVal);
+      const isSuffixUnique = (bottomVal !== rightVal);
+
+      if (isTopValid && isLeftValid && isPrefixUnique &&
+          isBottomValid && isRightValid && isSuffixUnique) {
+        soundCorrect();
+        const timeBonus = Math.floor(timeLeft * 1.2);
+        score += (50 + timeBonus);
+        document.getElementById('score-txt').textContent = `得分：${score}`;
+
+        setTimeout(() => {
+          currentQIndex++;
+          loadQuestion();
+        }, 1000);
+      } else {
+        soundWrong();
+        const grid = document.getElementById('main-cross-grid');
+        grid.style.animation = "shake 0.4s ease";
+        setTimeout(() => {
+          grid.style.animation = "";
+          startTimer();
+        }, 500);
+      }
+    }
+
+    function clearCurrentQuestion() {
+      ['top', 'bottom', 'left', 'right'].forEach(pos => {
+        const input = document.getElementById(`input-${pos}`);
+        input.value = "";
+        input.classList.remove('filled');
+      });
+      document.getElementById('input-top').focus();
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      timeLeft = 60;
+      updateTimerUI();
+
+      timer = setInterval(() => {
+        timeLeft -= 0.1;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          clearInterval(timer);
+          soundWrong();
+          currentQIndex++;
+          loadQuestion();
+        }
+        updateTimerUI();
+      }, 100);
+    }
+
+    function updateTimerUI() {
+      document.getElementById('timer-txt').textContent = `⏱️ ${Math.ceil(timeLeft)} 秒`;
+      const pct = (timeLeft / 60) * 100;
+      document.getElementById('progress-bar').style.width = `${pct}%`;
+    }
+
+    function getLeaderboard() {
+      const data = localStorage.getItem('crossword_leaderboard_v5');
+      return data ? JSON.parse(data) : [];
+    }
+
+    function showResultsAndLeaderboard() {
+      clearInterval(timer);
+
+      const list = getLeaderboard();
+      const currentRun = { name: playerName, score: score, id: Date.now() };
+      list.push(currentRun);
+
+      list.sort((a, b) => b.score - a.score);
+      localStorage.setItem('crossword_leaderboard_v5', JSON.stringify(list));
+
+      const myRank = list.findIndex(item => item.id === currentRun.id) + 1;
+
+      document.getElementById('result-player-name').textContent = playerName;
+      document.getElementById('result-score-val').textContent = score;
+      document.getElementById('player-rank-txt').textContent = `🏆 您本次成績排名：第 ${myRank} 名（共 ${list.length} 位參賽者）`;
+
+      let rankTitle = "漢字新星 🌟";
+      if (score >= 220) rankTitle = "漢字大滿貫 👑";
+      else if (score >= 140) rankTitle = "詞語達人 🎯";
+      document.getElementById('rank-badge').textContent = rankTitle;
+
+      const tbody = document.getElementById('result-leaderboard-body');
+      tbody.innerHTML = "";
+      const top5 = list.slice(0, 5);
+
+      top5.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        if (item.id === currentRun.id) {
+          tr.className = "current-user-row";
+        }
+
+        let rankBadge = idx === 0 ? '🥇 1' : (idx === 1 ? '🥈 2' : (idx === 2 ? '🥉 3' : idx + 1));
+        let rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''));
+
+        tr.innerHTML = `
+          <td class="${rankClass}">${rankBadge}</td>
+          <td>${item.name} ${item.id === currentRun.id ? ' (您)' : ''}</td>
+          <td style="color:#10b981;">${item.score} 分</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('result-modal').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
