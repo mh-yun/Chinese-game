@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>字字珠機 - 自由手寫/輸入版 (iPad攤位專用)</title>
+  <title>字字珠機 - iPad自由手寫修復版</title>
   <style>
     :root {
       --primary-grad: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
@@ -150,7 +150,7 @@
       font-weight: 800;
     }
 
-    /* 原生輸入框樣式化 */
+    /* 輸入框樣式 */
     .char-input {
       width: 100%;
       height: 100%;
@@ -489,13 +489,13 @@
       <!-- 上 -->
       <div class="grid-cell cell-top">
         <span class="dir-tag tag-top">上</span>
-        <input type="text" id="input-top" class="char-input" maxlength="1" oninput="handleInput('top')" autocomplete="off" />
+        <input type="text" id="input-top" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
 
       <!-- 左 -->
       <div class="grid-cell cell-left">
         <span class="dir-tag tag-left">左</span>
-        <input type="text" id="input-left" class="char-input" maxlength="1" oninput="handleInput('left')" autocomplete="off" />
+        <input type="text" id="input-left" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
 
       <!-- 中（提示字） -->
@@ -504,18 +504,18 @@
       <!-- 右 -->
       <div class="grid-cell cell-right">
         <span class="dir-tag tag-right">右</span>
-        <input type="text" id="input-right" class="char-input" maxlength="1" oninput="handleInput('right')" autocomplete="off" />
+        <input type="text" id="input-right" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
 
       <!-- 下 -->
       <div class="grid-cell cell-bottom">
         <span class="dir-tag tag-bottom">下</span>
-        <input type="text" id="input-bottom" class="char-input" maxlength="1" oninput="handleInput('bottom')" autocomplete="off" />
+        <input type="text" id="input-bottom" class="char-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
     </div>
 
     <div class="input-hint-box">
-      ✍️ 點擊上方任意空格，使用 iPad 手寫或鍵盤輸入漢字，填滿後點擊「送出檢查」！
+      ✍️ 點擊上方任意空格，使用 iPad 手寫或鍵盤輸入漢字，填滿後點擊「驗證送出」！
     </div>
 
     <div class="action-row">
@@ -554,7 +554,6 @@
   </div>
 
   <script>
-    // 擴充的小學常用字詞資料庫（開放式多樣答案核對機制）
     const questionPool = [
       {
         centerChar: "水",
@@ -568,7 +567,7 @@
       },
       {
         centerChar: "木",
-        validPrefixes: ["積", "伐", "樹", "神", "草", "佳", "獨", "移", "枯", "琢", "麻", "灌", "伐", "喬", "灌"],
+        validPrefixes: ["積", "伐", "樹", "神", "草", "佳", "獨", "移", "枯", "琢", "麻", "灌", "喬"],
         validSuffixes: ["頭", "馬", "板", "偶", "材", "工", "筏", "棉", "屋", "牌", "桶", "箱", "門", "梳", "船"]
       },
       {
@@ -590,6 +589,7 @@
     let timer = null;
     let playerName = "挑戰者";
 
+    // 音效
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playTone(freq, type, duration) {
       try {
@@ -650,21 +650,46 @@
         const input = document.getElementById(`input-${pos}`);
         input.value = "";
         input.classList.remove('filled');
+        setupInputListeners(input, pos);
       });
 
       // 自動聚焦第一格
       setTimeout(() => {
-        const topInput = document.getElementById('input-top');
-        topInput.focus();
+        document.getElementById('input-top').focus();
       }, 300);
 
       startTimer();
     }
 
-    function handleInput(pos) {
-      soundTap();
-      const input = document.getElementById(`input-${pos}`);
-      if (input.value.trim() !== "") {
+    // ⭐ 關鍵修復：專門為手寫/中文輸入法綁定的監聽事件
+    function setupInputListeners(input, pos) {
+      let isComposing = false; // 是否處於手寫組字狀態
+
+      input.oncompositionstart = () => {
+        isComposing = true; // 學生開始落筆手寫，鎖定自動跳格
+      };
+
+      input.oncompositionend = () => {
+        isComposing = false; // 學生選定漢字，完成寫字
+        finalizeInput(input, pos);
+      };
+
+      input.oninput = () => {
+        // 只有當「非組字手寫狀態」時（例如直接貼上或英文退格），才處理
+        if (!isComposing) {
+          finalizeInput(input, pos);
+        }
+      };
+
+      input.onfocus = () => soundTap();
+    }
+
+    function finalizeInput(input, pos) {
+      let val = input.value.trim();
+      if (val.length > 0) {
+        // 若輸入多於一個字，只取最後寫入的那個字
+        val = val.slice(-1);
+        input.value = val;
         input.classList.add('filled');
         autoAdvance(pos);
       } else {
@@ -677,141 +702,4 @@
       const currentIndex = order.indexOf(currentPos);
       
       for (let i = 1; i <= order.length; i++) {
-        const nextPos = order[(currentIndex + i) % order.length];
-        const nextInput = document.getElementById(`input-${nextPos}`);
-        if (nextInput.value.trim() === "") {
-          nextInput.focus();
-          break;
-        }
-      }
-    }
-
-    function verifyAnswers() {
-      const topVal = document.getElementById('input-top').value.trim();
-      const bottomVal = document.getElementById('input-bottom').value.trim();
-      const leftVal = document.getElementById('input-left').value.trim();
-      const rightVal = document.getElementById('input-right').value.trim();
-
-      if (!topVal || !bottomVal || !leftVal || !rightVal) {
-        alert("請先填滿上、下、左、右四個格子喔！");
-        return;
-      }
-
-      clearInterval(timer);
-      const q = currentQuestions[currentQIndex];
-
-      const isTopValid = q.validPrefixes.includes(topVal);
-      const isLeftValid = q.validPrefixes.includes(leftVal);
-      const isPrefixUnique = (topVal !== leftVal);
-
-      const isBottomValid = q.validSuffixes.includes(bottomVal);
-      const isRightValid = q.validSuffixes.includes(rightVal);
-      const isSuffixUnique = (bottomVal !== rightVal);
-
-      if (isTopValid && isLeftValid && isPrefixUnique &&
-          isBottomValid && isRightValid && isSuffixUnique) {
-        soundCorrect();
-        const timeBonus = Math.floor(timeLeft * 1.2);
-        score += (50 + timeBonus);
-        document.getElementById('score-txt').textContent = `得分：${score}`;
-
-        setTimeout(() => {
-          currentQIndex++;
-          loadQuestion();
-        }, 1000);
-      } else {
-        soundWrong();
-        const grid = document.getElementById('main-cross-grid');
-        grid.style.animation = "shake 0.4s ease";
-        setTimeout(() => {
-          grid.style.animation = "";
-          startTimer();
-        }, 500);
-      }
-    }
-
-    function clearCurrentQuestion() {
-      ['top', 'bottom', 'left', 'right'].forEach(pos => {
-        const input = document.getElementById(`input-${pos}`);
-        input.value = "";
-        input.classList.remove('filled');
-      });
-      document.getElementById('input-top').focus();
-    }
-
-    function startTimer() {
-      clearInterval(timer);
-      timeLeft = 60;
-      updateTimerUI();
-
-      timer = setInterval(() => {
-        timeLeft -= 0.1;
-        if (timeLeft <= 0) {
-          timeLeft = 0;
-          clearInterval(timer);
-          soundWrong();
-          currentQIndex++;
-          loadQuestion();
-        }
-        updateTimerUI();
-      }, 100);
-    }
-
-    function updateTimerUI() {
-      document.getElementById('timer-txt').textContent = `⏱️ ${Math.ceil(timeLeft)} 秒`;
-      const pct = (timeLeft / 60) * 100;
-      document.getElementById('progress-bar').style.width = `${pct}%`;
-    }
-
-    function getLeaderboard() {
-      const data = localStorage.getItem('crossword_leaderboard_v5');
-      return data ? JSON.parse(data) : [];
-    }
-
-    function showResultsAndLeaderboard() {
-      clearInterval(timer);
-
-      const list = getLeaderboard();
-      const currentRun = { name: playerName, score: score, id: Date.now() };
-      list.push(currentRun);
-
-      list.sort((a, b) => b.score - a.score);
-      localStorage.setItem('crossword_leaderboard_v5', JSON.stringify(list));
-
-      const myRank = list.findIndex(item => item.id === currentRun.id) + 1;
-
-      document.getElementById('result-player-name').textContent = playerName;
-      document.getElementById('result-score-val').textContent = score;
-      document.getElementById('player-rank-txt').textContent = `🏆 您本次成績排名：第 ${myRank} 名（共 ${list.length} 位參賽者）`;
-
-      let rankTitle = "漢字新星 🌟";
-      if (score >= 220) rankTitle = "漢字大滿貫 👑";
-      else if (score >= 140) rankTitle = "詞語達人 🎯";
-      document.getElementById('rank-badge').textContent = rankTitle;
-
-      const tbody = document.getElementById('result-leaderboard-body');
-      tbody.innerHTML = "";
-      const top5 = list.slice(0, 5);
-
-      top5.forEach((item, idx) => {
-        const tr = document.createElement('tr');
-        if (item.id === currentRun.id) {
-          tr.className = "current-user-row";
-        }
-
-        let rankBadge = idx === 0 ? '🥇 1' : (idx === 1 ? '🥈 2' : (idx === 2 ? '🥉 3' : idx + 1));
-        let rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : ''));
-
-        tr.innerHTML = `
-          <td class="${rankClass}">${rankBadge}</td>
-          <td>${item.name} ${item.id === currentRun.id ? ' (您)' : ''}</td>
-          <td style="color:#10b981;">${item.score} 分</td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      document.getElementById('result-modal').classList.remove('hidden');
-    }
-  </script>
-</body>
-</html>
+        const nextPos = order
